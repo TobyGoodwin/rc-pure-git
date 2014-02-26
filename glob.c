@@ -21,6 +21,11 @@
 # endif
 #endif
 
+#ifdef HAVE_UNISTD_H
+# include <unistd.h>
+#endif
+
+
 static List *dmatch(char *, char *, char *);
 static List *doglob(char *, char *);
 static List *lglob(List *, char *, char *, size_t);

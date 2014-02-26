@@ -34,6 +34,12 @@ static Input *istack, *itop;
 
 int lastchar;
 
+/* XXX these came from lex.c */
+int lineno;
+const char nw[] = { 0 }, dnw[] = { 0 };
+void yyerror(const char *err) {
+}
+
 static char *prompt, *prompt2;
 
 extern void ugchar(int c) {

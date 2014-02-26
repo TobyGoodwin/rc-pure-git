@@ -84,12 +84,11 @@ mkstatval_LDADD = $(LDADD)
 am_rc_OBJECTS = builtins.$(OBJEXT) except.$(OBJEXT) exec.$(OBJEXT) \
 	fn.$(OBJEXT) footobar.$(OBJEXT) getopt.$(OBJEXT) \
 	glob.$(OBJEXT) glom.$(OBJEXT) hash.$(OBJEXT) heredoc.$(OBJEXT) \
-	input.$(OBJEXT) lex.$(OBJEXT) list.$(OBJEXT) main.$(OBJEXT) \
-	match.$(OBJEXT) nalloc.$(OBJEXT) open.$(OBJEXT) \
-	parse.$(OBJEXT) print.$(OBJEXT) redir.$(OBJEXT) \
-	signal.$(OBJEXT) status.$(OBJEXT) tree.$(OBJEXT) \
-	utils.$(OBJEXT) var.$(OBJEXT) wait.$(OBJEXT) walk.$(OBJEXT) \
-	which.$(OBJEXT)
+	input.$(OBJEXT) list.$(OBJEXT) main.$(OBJEXT) match.$(OBJEXT) \
+	nalloc.$(OBJEXT) open.$(OBJEXT) parse.$(OBJEXT) \
+	print.$(OBJEXT) redir.$(OBJEXT) signal.$(OBJEXT) \
+	status.$(OBJEXT) tree.$(OBJEXT) utils.$(OBJEXT) var.$(OBJEXT) \
+	wait.$(OBJEXT) walk.$(OBJEXT) which.$(OBJEXT)
 rc_OBJECTS = $(am_rc_OBJECTS)
 am__DEPENDENCIES_1 =
 tripping_SOURCES = tripping.c
@@ -259,7 +258,7 @@ top_srcdir = @top_srcdir@
 @AMC_NO_HASHBANG_TRUE@EXECVE = execve.o
 @AMC_RESTART_FALSE@SYSTEM = system.o
 @AMC_RESTART_TRUE@SYSTEM = system-bsd.o
-rc_SOURCES = builtins.c except.c exec.c fn.c footobar.c getopt.c glob.c glom.c hash.c heredoc.c input.c lex.c list.c main.c match.c nalloc.c open.c parse.c print.c redir.c signal.c status.c tree.c utils.c var.c wait.c walk.c which.c
+rc_SOURCES = builtins.c except.c exec.c fn.c footobar.c getopt.c glob.c glom.c hash.c heredoc.c input.c list.c main.c match.c nalloc.c open.c parse.c print.c redir.c signal.c status.c tree.c utils.c var.c wait.c walk.c which.c
 EXTRA_rc_SOURCES = addon.c edit-bsd.c edit-gnu.c edit-null.c execve.c system.c system-bsd.c
 rc_DEPENDENCIES = sigmsgs.o $(ADDON) $(EDIT) $(EXECVE) $(SYSTEM)
 rc_LDADD = sigmsgs.o $(ADDON) $(EDIT) $(EXECVE) $(SYSTEM)
@@ -404,7 +403,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/heredoc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/history.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/input.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lex.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/list.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/match.Po@am__quote@
@@ -886,6 +884,8 @@ statval.h: mkstatval
 #	$(YACC) -d $(srcdir)/parse.y
 #	mv y.tab.c parse.c
 #	mv y.tab.h parse.h
+parse.c parse.h: $(srcdir)/parse.pacc
+	pacc -d $^
 
 check: trip
 

@@ -1,3 +1,5 @@
+#ifndef RC_H
+#define RC_H 1
 #undef NDEBUG
 #include "config.h"
 #include "proto.h"
@@ -392,3 +394,4 @@ extern bool forked;
 /* walk.c */
 extern bool walk(Node *, bool);
 extern bool cond;
+#endif

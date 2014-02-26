@@ -2,6 +2,16 @@
 
 #include "rc.h"
 
+Redir redirFrom(void) {
+    static Redir r = { rFrom, 0 };
+    return r;
+}
+
+Redir redirCreate(void) {
+    static Redir r = { rCreate, 1 };
+    return r;
+}
+
 /* make a new node, pass it back to yyparse. Used to generate the parsetree. */
 
 extern Node *mk(int /*nodetype*/ t,...) {
