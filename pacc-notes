@@ -1,0 +1,82 @@
+Notes on converting rc from yacc to pacc
+========================================
+
+Todo list items arising:
+
+- report missing definition errors with the site of their call
+- report left recursion errors with the site of their call
+- report rule not reached errors with the site of their call
+- make "rule `Foo' not reached a warning, not a fatal
+- document bound literals
+- work out some way to report the start of an unclosed brace (e.g. given a rule
+  like ``s <- "yes" { 1`` we get an error at the end of the input, with no clue
+  as to where the actual error is)
+- coords for ``-> x`` expressions
+
+Started by updating the build system to invoke pacc instead of yacc
+
+Copied parse.y to parse.pacc
+
+Lots of errors! First, there is yacc boilerplate: token declarations,
+precedence rules, type information and the like. For now, this is simply
+commented out.
+
+The yacc grammar uses, for example, ``'('``. That's not, of course, a complete
+equivalent of pacc's ``"("``, as the former is the lexical token ``(`` (with
+suitable whitespace handling). So eventually we will have te replace it with a
+call to a lexical rule, presumably ``lParen ← "(" _``. Just for now, though,
+the literal will do.
+
+Next, there are calls to lex tokens, which are capitalized. The first of these
+that I came across is ``DUP``, a "token" such as ``>[2=1]``. Truly grody code
+in the lexer to handle those. Let's see if we can do better. What on earth is a
+SREDIR?
+
+It is definitely unfortunate that pacc doesn't report the site of calls to
+undefined rules. For example, we get an error like this::
+
+  pacc: fatal: rule not found: `Decimal' (called from `Dup')
+
+Much better would be this::
+
+  parse.pacc:100:15: rule `Decimal' not defined
+
+But to do that I'd have to carry coords around in every call. That can be done,
+but it's one for the next release I think.
+
+Lots of left recursions. Much of this is building lists, which we'll simply do
+backwards. Another part of the problem is that yacc doesn't have anything like
+the ``*`` operator (is that really so? probably, it's a very long time since
+I've done anything much with yacc). So we have rules like this::
+
+  optnl	= /* empty */
+	| optnl "\n"
+
+which in pacc could simply be ``optnl ← "\n"*`` (except that what this rule is
+doing will probably be replaced with some feeding stuff).
+
+Eventually got to the point where pacc would accept the input, although most of
+the semantic actions were still utterly bogus. And bang! An assertion fires.
+(Uncovering bugs like this is part of the point of hacking on a real life
+example.)
+
+So, incredibly, I have never written a grammar before where a semantic value is
+spread over more than one line. The output routine ``c_str()`` asserts that
+there are no ``\n`` characters in its input; I presume that this is so the
+indentation doesn't get messed up. But since we're calling it from ``c_code()``
+for user-supplied C code, that won't wash. On the other hand, when
+``need_indent`` is zero (as we set it in ``c_code()``), all ``c_str()`` is doing
+for us is an ``fputs()``. So that's an easy fix.
+
+I've now got as far as having a grammar file that pacc will parse. Currently
+the C code that it emits is nonsense, but at least we're making some progress.
+I'd forgotten that pacc emits C99 code (this needs to be documented). So gcc
+needs to be invoked with ``-std=gnu99`` (other bits of rc fail with
+``-std=c99``).
+
+So pacc is reporting C errors at the right line, but the wrong column. Not
+quite sure why: there are tabs involved, so it might just be that. Let's see.
+Well, one bug there I'd already fixed (but not updated the binary I'm using). I
+also found another couple of off-by-one errors in handling coords. And then I
+made the horrifying discovery that braceless expressions (e.g. ``-> x``) don't
+include coords!

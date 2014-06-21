@@ -1,0 +1,219 @@
+/* parse.y */
+
+/*
+ * Adapted from rc grammar, v10 manuals, volume 2.
+ */
+
+{
+/* note that this actually needs to appear before any system header
+   files are included; byacc likes to throw in <stdlib.h> first. */
+#include "rc.h"
+
+static Node *star, *nolist;
+Node *parsetree;	/* not using yylval because bison declares it as an auto */
+
+}
+
+/*
+%token ANDAND BACKBACK BANG CASE COUNT DUP ELSE END FLAT FN FOR IF IN
+%token OROR PIPE REDIR SREDIR SUB SUBSHELL SWITCH TWIDDLE WHILE WORD HUH
+
+%left WHILE ')' ELSE
+%left ANDAND OROR '\n'
+%left BANG SUBSHELL
+%left PIPE
+%right '$' 
+%left SUB
+*/
+/*
+*/
+
+/*
+%union {
+	struct Node *node;
+	struct Redir redir;
+	struct Pipe pipe;
+	struct Dup dup;
+	struct Word word;
+	char *keyword;
+}
+
+%type <redir> REDIR SREDIR
+%type <pipe> PIPE
+%type <dup> DUP
+%type <word> WORD
+%type <keyword> keyword
+%type <node> assign body brace case cbody cmd cmdsa cmdsan comword epilog
+	     first line nlwords paren redir sword simple iftail word words
+
+%start rc
+
+%%
+*/
+
+rc :: Node * ← l:line /*end*/  { l }
+//	| error end		{ yyerrok; parsetree = NULL; YYABORT; }
+
+/* an rc line may end in end-of-file as well as newline, e.g., rc -c 'ls' */
+/*
+end	← END	/* EOF 	{ if (!heredoc(1)) YYABORT; } /* flag error if there is a heredoc in the queue 
+	| "\n"			{ if (!heredoc(0)) YYABORT; } /* get heredoc on \n 
+*/
+
+/* a cmdsa is a command followed by ampersand or newline (used in "line" and "body") */
+cmdsa	← c:cmd ";" → c
+	| c:cmd "&"		{ c != NULL ? mk(nNowait, c) :  c }
+
+/* a line is a single command, or a command terminated by ; or & followed by a line (recursive) */
+line	← c:cmd → c
+	| c:cmdsa l:line		{ c != NULL ? mk(nBody,c,l) : l }
+
+/* a body is like a line, only commands may also be terminated by newline */
+body	← c:cmd → c
+	| c:cmdsan b:body	{ c == NULL ? b : b == NULL ? c : mk(nBody,c,b) }
+
+cmdsan	← c:cmdsa → c
+	| c:cmd "\n"		{ c /* $1; if (!heredoc(0)) YYABORT; } get h.d. on \n */ }
+
+brace	← "{" b:body "}" → b
+
+paren	← "(" b:body ")" → b
+
+assign	← f:First "=" w:word	{ mk(nAssign, f, w) }
+
+epilog	← % → 0
+	| r:redir e:epilog		{ mk(nEpilog, r, e) }
+
+/* a redirection is a dup (e.g., >[1=2]) or a file redirection. (e.g., > /dev/null) */
+redir	← r:Redir "[" l:Decimal "=" r:Decimal "]"	{ mk(nDup, r, l, r) }
+	| r:Redir "[" d:Decimal "]" w:word		{ mk(nRedir, r, d, w)
+				  //if ($1.type == rHeredoc && !qdoc($2, $$)) YYABORT; /* queue heredocs up */
+				}
+/*
+	| SREDIR word		{ mk(nRedir,$1.type,$1.fd,$2);
+				  if ($1.type == rHeredoc && !qdoc($2, $$)) YYABORT; /* queue heredocs up */
+
+#Dup :: struct Dup 	← r:Redir "[" a:Decimal ( "=" b:Decimal )? "]" _ → a
+
+Redir :: redirtype
+    ← "<<<" → rHerestring
+    / "<<" → rHeredoc
+    / "<" → rFrom
+    / ">>" → rAppend
+    / ">" → rCreate
+
+Decimal :: int ← d:[0-9]+ _ → { atoi((const char *)ref_ptr(ref())) }
+
+_ :: void ← [ \t\n]*
+
+case :: struct Node * ← "case":Word w:Words ";"		{ mk(nCase, w) }
+	| "case":Word w:Words "\n"	 		{ mk(nCase, w) }
+
+cbody	← c:cmd					{ mk(nCbody, c, NULL) }
+	| c:case d:cbody			{ mk(nCbody, c, d) }
+	| c:cmdsan d:cbody			{ mk(nCbody, c, d) }
+
+iftail	← c:cmd → c
+	| b:brace "else":Word optNl c:cmd	{ mk(nElse, b, c) }
+
+cmd	← % → 0
+	| s:SimpleRedir → s
+	| b:brace e:epilog			{ mk(nBrace, b, e) }
+	| "if":Word p:paren optNl t:iftail	{ mk(nIf, p, t) }
+	| "for":Word "(" w:word "in":Word ws:Words ")" optNl c:cmd
+		{ mk(nForin, w, ws, c) }
+	| "for":Word "(" w:word ")" optNl c:cmd	{ mk(nForin, w, star, c) }
+	| "while":Word p:paren optNl c:cmd	{ mk(nWhile, p, c) }
+	| "switch":Word "(" w:word ")" optNl "{" c:cbody "}" { mk(nSwitch, w, c) }
+	| Tilde optCaret w:word ws:Words	{ mk(nMatch, w, ws) }
+//	| a:cmd AndAnd optNl b:cmd		{ mk(nAndalso, a, b) }
+//	| a:cmd OrOr optNl b:cmd		{ mk(nOrelse, a, b) }
+ //	| a:cmd p:Pipe optNl b:cmd		{ mk(nPipe, p.left, p.right, a, b) }
+	| r:redir c:cmd			{ (c != NULL ? mk(nPre, r, c) : r) }
+	| a:assign c:cmd		{ (c != NULL ? mk(nPre, a, c) : a) }
+	| Bang optCaret c:cmd			{ mk(nBang, c) }
+	| And optCaret c:cmd			{ mk(nSubshell, c) }
+	| "fn":Word ws:Words b:brace		{ mk(nNewfn, ws, b) }
+	| "fn":Word ws:Words			{ mk(nRmfn, ws) }
+
+SimpleRedir ← s:Simple r:Redir { mk(nArgs, s, r) }
+
+Simple ← a:First → a
+	| w:First ws:Words { mk(nArgs, w, ws) }
+
+First	← c:comword ("^" sword)* → c // XXX!!
+
+sword	← c:comword → c
+//	| keyword			{ mk(nWord, $1, NULL, FALSE); }
+
+word	← w:sword → w
+	| a:sword "^" b:word		{ mk(nConcat, a, b) }
+/*
+simple	← First
+	| a:simple b:word		{ (b != NULL ? mk(nArgs, a, b) : a) }
+	| a:simple b:redir		{ mk(nArgs, a, b) }
+
+first	← comword
+	| a:sword "^" b:first		{ mk(nConcat, a, b) }
+
+sword	← comword
+//	| keyword			{ mk(nWord, $1, NULL, FALSE); }
+
+word	← sword
+	| a:word "^" b:sword		{ mk(nConcat, a, b) }
+*/ 
+
+comword	← "$" s:sword			{ mk(nVar, s) }
+	| "$" s:sword lParen ws:Words ")"	{ mk(nVarsub, s, ws) }
+	| "$#" s:sword			{ mk(nCount, s) }
+	| "$^" s:sword			{ mk(nFlat,  s) }
+	| "`" s:sword			{ mk(nBackq,nolist, s) }
+	| "`" b:brace			{ mk(nBackq,nolist, b) }
+	| "``" a:word b:brace		{ mk(nBackq, a, b) }
+	| "``" a:word b:sword		{ mk(nBackq, a, b) }
+	| "(" ws:nlwords ")"		{ ws }
+	| r:redir b:brace		{ mk(nNmpipe, r->type, ((struct Redir *)r)->fd, b) }
+	| w:Word			{ mk(nWord, ((struct Word *)w)->w, ((struct Word *)w)->m, ((struct Word *)w)->q) }
+
+/*
+keyword	← FOR		{ "for"; }
+	| IN		{ "in"; }
+	| WHILE		{ "while"; }
+	| IF		{ "if"; }
+	| SWITCH	{ "switch"; }
+	| FN		{ "fn"; }
+	| ELSE		{ "else"; }
+	| CASE		{ "case"; }
+	| TWIDDLE	{ "~"; }
+	| BANG		{ "!"; }
+	| SUBSHELL	{ "@"; }
+*/
+
+Words ← w:Word ws:Words { mk(nLappend, w, ws) }
+	| % → 0
+
+nlwords ←		{ NULL }
+	| ws:Words "\n"? → ws
+	| w:word ws:nlwords 	{ (w != NULL ? (ws != NULL ? mk(nLappend, w, ws) : w) : ws) }
+
+
+Word :: ref_t ← w:[A-Za-z0-9]+ _ → w
+
+And :: void ← "&" _
+
+//AndAnd ← "&&" _
+Bang ← "!" _
+optCaret ← "^"? _
+optNl ← "\n"*
+lParen ← "(" _
+//Pipe ← "|" _
+//OrOr ← "||" _
+Tilde ← "~" _
+
+/*
+
+void initparse() {
+	star = treecpy(mk(nVar, mk(nWord,"*", NULL, FALSE)), ealloc);
+	nolist = treecpy(mk(nVar, mk(nWord,"ifs", NULL, FALSE)), ealloc);
+}
+*/
